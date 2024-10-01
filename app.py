@@ -36,7 +36,7 @@ TMDB_API_KEY = os.getenv('TMDB_API_KEY')
 
 @app.route('/tmdb/movies', methods=['GET'])
 def get_tmdb_movies():
-    url = f'https://api.themoviedb.org/3/movie/popular?api_key={fbb7ffc5db8c5c3e8f6cf295169dc552}&language=en-US&page=1'
+    url = f'https://api.themoviedb.org/3/movie/popular?api_key={TMDB_API_KEY}&language=en-US&page=1'
     response = requests.get(url)
     if response.status_code != 200:
         return jsonify({'message': 'Failed to fetch movies from TMDB'}), 500
