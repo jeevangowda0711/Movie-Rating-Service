@@ -32,43 +32,34 @@ CORS(app)
 # Import models after initializing db to avoid circular imports
 from models import User, Movie, Rating, UploadedFile
 
-### New Frontend Routes
+# ### New Frontend Routes
 
-<<<<<<< HEAD
-# Home Page Route (Login/Register page)
-@app.route('/')
-def index():
-    return render_template('index.html')
-=======
-@app.route('/tmdb/movies', methods=['GET'])
-def get_tmdb_movies():
-    url = f'https://api.themoviedb.org/3/movie/popular?api_key={TMDB_API_KEY}&language=en-US&page=1'
-    response = requests.get(url)
-    if response.status_code != 200:
-        return jsonify({'message': 'Failed to fetch movies from TMDB'}), 500
->>>>>>> 3a8d20eb2a844acb09e8ae93ac6cee559275edf6
+# # Home Page Route (Login/Register page)
+# @app.route('/')
+# def index():
+#     return render_template('index.html')
 
-# Route to display login form
-@app.route('/login', methods=['GET'])
-def show_login_form():
-    return render_template('login.html')
+# # Route to display login form
+# @app.route('/login', methods=['GET'])
+# def show_login_form():
+#     return render_template('login.html')
 
-# Route to display registration form
-@app.route('/register', methods=['GET'])
-def show_register_form():
-    return render_template('register.html')
+# # Route to display registration form
+# @app.route('/register', methods=['GET'])
+# def show_register_form():
+#     return render_template('register.html')
 
-# Movies List Page Route
-@app.route('/movies')
-def movies():
-    return render_template('movies.html')
+# # Movies List Page Route
+# @app.route('/movies')
+# def movies():
+#     return render_template('movies.html')
 
-# Uploads Page Route
-@app.route('/uploads')
-def uploads():
-    return render_template('uploads.html')
+# # Uploads Page Route
+# @app.route('/uploads')
+# def uploads():
+#     return render_template('uploads.html')
 
-### Existing API Endpoints (No Change)
+### Existing API Endpoints
 
 # User Registration Endpoint
 @app.route('/register', methods=['POST'])
