@@ -1,0 +1,30 @@
+.movie-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+  padding: 0;
+}
+
+.movie-item {
+  list-style: none;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  overflow: hidden;
+  text-align: center;
+  padding: 10px;
+}
+
+.movie-item img {
+  max-width: 100%;
+  border-bottom: 1px solid #ccc;
+}
+
+.movie-item h3 {
+  font-size: 1.2em;
+  margin: 10px 0;
+}
+
+.movie-item form {
+  margin-top: 10px;
+}

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from werkzeug.security import generate_password_hash, check_password_hash
 from extensions import db
 
@@ -7,7 +7,7 @@ class User(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(150), unique=True, nullable=False)
-    password_hash = db.Column(db.Text, nullable=False)  # Changed to db.Text
+    password_hash = db.Column(db.Text, nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
     ratings = db.relationship('Rating', backref='user', lazy=True)
     uploaded_files = db.relationship('UploadedFile', backref='user', lazy=True)
@@ -23,6 +23,11 @@ class Movie(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), unique=True, nullable=False)
+    overview = db.Column(db.Text, nullable=True)
+    poster_path = db.Column(db.String(500), nullable=True)  # URL to the movie poster image
+    release_date = db.Column(db.String(100), nullable=True)  # Storing as string; consider datetime if needed
+    vote_average = db.Column(db.Float, nullable=True)  # Average rating on TMDB
+
     ratings = db.relationship('Rating', backref='movie', lazy=True)
 
 class Rating(db.Model):
@@ -32,7 +37,7 @@ class Rating(db.Model):
     rating = db.Column(db.Integer, nullable=False)  # Assume rating is between 1 and 5
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     movie_id = db.Column(db.Integer, db.ForeignKey('movies.id'), nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 class UploadedFile(db.Model):
     __tablename__ = 'uploaded_files'
@@ -40,5 +45,5 @@ class UploadedFile(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(255), nullable=False)
     filepath = db.Column(db.String(255), nullable=False)
-    upload_date = db.Column(db.DateTime, default=datetime.utcnow)
+    upload_date = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)

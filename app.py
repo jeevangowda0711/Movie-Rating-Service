@@ -1,11 +1,12 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, render_template, redirect, url_for
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from flask_cors import CORS
 from functools import wraps
-import requests
 import os
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv  # Import load_dotenv
+from datetime import datetime, timezone
+import requests
 
 from extensions import db, migrate, jwt
 
@@ -31,18 +32,34 @@ CORS(app)
 # Import models after initializing db to avoid circular imports
 from models import User, Movie, Rating, UploadedFile
 
-# TMDB integration
-TMDB_API_KEY = os.getenv('TMDB_API_KEY')
+### New Frontend Routes
 
-@app.route('/tmdb/movies', methods=['GET'])
-def get_tmdb_movies():
-    url = f'https://api.themoviedb.org/3/movie/popular?api_key={fbb7ffc5db8c5c3e8f6cf295169dc552}&language=en-US&page=1'
-    response = requests.get(url)
-    if response.status_code != 200:
-        return jsonify({'message': 'Failed to fetch movies from TMDB'}), 500
+# Home Page Route (Login/Register page)
+@app.route('/')
+def index():
+    return render_template('index.html')
 
-    movies = response.json().get('results', [])
-    return jsonify(movies), 200
+# Route to display login form
+@app.route('/login', methods=['GET'])
+def show_login_form():
+    return render_template('login.html')
+
+# Route to display registration form
+@app.route('/register', methods=['GET'])
+def show_register_form():
+    return render_template('register.html')
+
+# Movies List Page Route
+@app.route('/movies')
+def movies():
+    return render_template('movies.html')
+
+# Uploads Page Route
+@app.route('/uploads')
+def uploads():
+    return render_template('uploads.html')
+
+### Existing API Endpoints (No Change)
 
 # User Registration Endpoint
 @app.route('/register', methods=['POST'])
@@ -82,7 +99,6 @@ def login():
                         }), 200
     else:
         return jsonify({'message': 'Invalid username or password'}), 401
-    
 
 # Decorator to check if a user is an admin
 def admin_required(f):
@@ -232,7 +248,6 @@ def allowed_file(filename):
 @app.route('/upload', methods=['POST'])
 @jwt_required()
 def upload_file():
-
     if 'file' not in request.files:
         return jsonify({'message': 'No file part in the request'}), 400
 
@@ -261,7 +276,6 @@ def upload_file():
     else:
         allowed = ", ".join(app.config['ALLOWED_EXTENSIONS'])
         return jsonify({'message': f'Allowed file types are: {allowed}'}), 400
-
 
 # List All Uploaded Files (Admin Only) Endpoint
 @app.route('/files', methods=['GET'])
@@ -342,13 +356,37 @@ def delete_file(file_id):
 
     return jsonify({'message': 'File deleted successfully'}), 200
 
-# Fetch All Movies Endpoint
+# Fetch All Movies Endpoint (send poster paths and ratings too)
 @app.route('/movies', methods=['GET'])
 def get_movies():
-    movies = Movie.query.all()
-    output = [{'id': movie.id, 'title': movie.title} for movie in movies]
-    return jsonify({'movies': output}), 200
+    page = request.args.get('page', 1, type=int)  # Default to page 1 if not provided
+    per_page = 20  # Number of movies per page
+    movies = Movie.query.paginate(page=page, per_page=per_page, error_out=False)
+    
+    output = [{
+        'id': movie.id,
+        'title': movie.title,
+        'overview': movie.overview,
+        'release_date': movie.release_date,
+        'poster_path': movie.poster_path,
+        'vote_average': movie.vote_average
+    } for movie in movies.items]
 
+    # Print output to check
+    print(output)
+
+    return jsonify({
+        'movies': output,
+        'total_pages': movies.pages,
+        'current_page': movies.page
+    }), 200
+
+
+
+# Serve static files
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    return send_from_directory(os.path.join(app.root_path, 'static'), filename)
 
 if __name__ == '__main__':
     app.run(debug=True)
