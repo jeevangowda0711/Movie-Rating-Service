@@ -34,10 +34,19 @@ from models import User, Movie, Rating, UploadedFile
 
 ### New Frontend Routes
 
+<<<<<<< HEAD
 # Home Page Route (Login/Register page)
 @app.route('/')
 def index():
     return render_template('index.html')
+=======
+@app.route('/tmdb/movies', methods=['GET'])
+def get_tmdb_movies():
+    url = f'https://api.themoviedb.org/3/movie/popular?api_key={TMDB_API_KEY}&language=en-US&page=1'
+    response = requests.get(url)
+    if response.status_code != 200:
+        return jsonify({'message': 'Failed to fetch movies from TMDB'}), 500
+>>>>>>> 3a8d20eb2a844acb09e8ae93ac6cee559275edf6
 
 # Route to display login form
 @app.route('/login', methods=['GET'])
