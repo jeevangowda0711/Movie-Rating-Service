@@ -4,7 +4,7 @@ from flask_cors import CORS
 from functools import wraps
 import os
 from werkzeug.utils import secure_filename
-from dotenv import load_dotenv  # Import load_dotenv
+from dotenv import load_dotenv  # Import dotenv to manage environment variables
 from datetime import datetime, timezone
 import requests
 
@@ -13,17 +13,18 @@ from extensions import db, migrate, jwt
 # Load environment variables from .env file
 load_dotenv()
 
+# Initialize Flask app and load configuration
 app = Flask(__name__)
 app.config.from_object('config.Config')
 
-# Ensure upload folder exists during app initialization
+# Ensure the upload folder exists when the app starts
 def ensure_upload_folder():
     if not os.path.exists(app.config['UPLOAD_FOLDER']):
         os.makedirs(app.config['UPLOAD_FOLDER'])
 
 ensure_upload_folder()
 
-# Initialize extensions with the app
+# Initialize extensions with the Flask app
 db.init_app(app)
 migrate.init_app(app, db)
 jwt.init_app(app)
@@ -32,46 +33,25 @@ CORS(app)
 # Import models after initializing db to avoid circular imports
 from models import User, Movie, Rating, UploadedFile
 
-# ### New Frontend Routes
 
-# # Home Page Route (Login/Register page)
-# @app.route('/')
-# def index():
-#     return render_template('index.html')
-
-# # Route to display login form
-# @app.route('/login', methods=['GET'])
-# def show_login_form():
-#     return render_template('login.html')
-
-# # Route to display registration form
-# @app.route('/register', methods=['GET'])
-# def show_register_form():
-#     return render_template('register.html')
-
-# # Movies List Page Route
-# @app.route('/movies')
-# def movies():
-#     return render_template('movies.html')
-
-# # Uploads Page Route
-# @app.route('/uploads')
-# def uploads():
-#     return render_template('uploads.html')
-
-### Existing API Endpoints
+# ==========================
+# USER AUTHENTICATION ROUTES
+# ==========================
 
 # User Registration Endpoint
 @app.route('/register', methods=['POST'])
 def register():
+    """Register a new user."""
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
     is_admin = data.get('is_admin', False)
 
+    # Check if user already exists
     if User.query.filter_by(username=username).first():
         return jsonify({'message': 'User already exists'}), 409
 
+    # Create new user and store in the database
     new_user = User(username=username, is_admin=is_admin)
     new_user.set_password(password)
     db.session.add(new_user)
@@ -79,29 +59,35 @@ def register():
 
     return jsonify({'message': 'User registered successfully'}), 201
 
+
 # User Login Endpoint
 @app.route('/login', methods=['POST'])
 def login():
+    """User login and token creation."""
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
 
+    # Authenticate the user
     user = User.query.filter_by(username=username).first()
     if user and user.check_password(password):
+        # Create JWT token
         access_token = create_access_token(identity={'id': user.id, 'is_admin': user.is_admin})
         return jsonify({
-                            'access_token': access_token,
-                            'user': {
-                                'id': user.id,
-                                'username': user.username,
-                                'is_admin': user.is_admin
-                            }
-                        }), 200
+            'access_token': access_token,
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'is_admin': user.is_admin
+            }
+        }), 200
     else:
         return jsonify({'message': 'Invalid username or password'}), 401
 
-# Decorator to check if a user is an admin
+
+# Decorator to restrict admin access
 def admin_required(f):
+    """Decorator to check if the user is an admin."""
     @wraps(f)
     @jwt_required()
     def decorated_function(*args, **kwargs):
@@ -111,53 +97,68 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+
+# ====================
+# MOVIE MANAGEMENT API
+# ====================
+
 # Admin Adds a New Movie Endpoint
 @app.route('/movies', methods=['POST'])
 @admin_required
 def add_movie():
+    """Admin adds a new movie to the database."""
     data = request.get_json()
     title = data.get('title')
 
+    # Check if movie already exists
     if Movie.query.filter_by(title=title).first():
         return jsonify({'message': 'Movie already exists'}), 409
 
+    # Add new movie
     new_movie = Movie(title=title)
     db.session.add(new_movie)
     db.session.commit()
 
-    return jsonify({'message': 'Movie added successfully'}), 201
+    return jsonify({'message': 'Movie added successfully', 'movie_id': new_movie.id}), 201
+
 
 # User Submits a Rating Endpoint
 @app.route('/movies/<int:movie_id>/rate', methods=['POST'])
 @jwt_required()
 def rate_movie(movie_id):
+    """User submits a rating for a movie."""
     data = request.get_json()
     rating_value = data.get('rating')
 
+    # Validate rating value
     if not isinstance(rating_value, int) or not (1 <= rating_value <= 5):
         return jsonify({'message': 'Rating must be an integer between 1 and 5'}), 400
 
+    # Fetch movie by ID
     movie = Movie.query.get(movie_id)
     if not movie:
         return jsonify({'message': 'Movie not found'}), 404
 
+    # Check if user already rated the movie
     identity = get_jwt_identity()
     user_id = identity['id']
-
     existing_rating = Rating.query.filter_by(user_id=user_id, movie_id=movie_id).first()
     if existing_rating:
         return jsonify({'message': 'You have already rated this movie'}), 409
 
+    # Add the new rating
     new_rating = Rating(rating=rating_value, user_id=user_id, movie_id=movie_id)
     db.session.add(new_rating)
     db.session.commit()
 
     return jsonify({'message': 'Rating submitted successfully'}), 201
 
+
 # Retrieve All User Ratings for All Movies Endpoint
 @app.route('/ratings', methods=['GET'])
 @jwt_required()
 def get_all_ratings():
+    """Retrieve all user ratings for all movies."""
     ratings = Rating.query.all()
     output = []
     for rating in ratings:
@@ -171,49 +172,64 @@ def get_all_ratings():
         output.append(rating_data)
     return jsonify({'ratings': output}), 200
 
+
 # Fetch Details for a Specific Movie Endpoint
 @app.route('/movies/<int:movie_id>', methods=['GET'])
 def get_movie(movie_id):
+    """Fetch details for a specific movie by ID, including its ratings."""
     movie = Movie.query.get(movie_id)
     if not movie:
         return jsonify({'message': 'Movie not found'}), 404
 
+    # Fetch all ratings related to the movie
     ratings = Rating.query.filter_by(movie_id=movie_id).all()
     ratings_list = [{'user_id': r.user_id, 'rating': r.rating} for r in ratings]
 
+    # Create movie_data dictionary with all necessary fields
     movie_data = {
         'id': movie.id,
         'title': movie.title,
+        'overview': movie.overview,
+        'release_date': movie.release_date,
+        'poster_path': movie.poster_path,
+        'vote_average': movie.vote_average,
         'ratings': ratings_list
     }
+
     return jsonify({'movie': movie_data}), 200
+
 
 # Update User's Own Movie Rating Endpoint
 @app.route('/movies/<int:movie_id>/rate', methods=['PUT'])
 @jwt_required()
 def update_rating(movie_id):
+    """User updates their own movie rating."""
     data = request.get_json()
     new_rating_value = data.get('rating')
 
+    # Validate rating value
     if not isinstance(new_rating_value, int) or not (1 <= new_rating_value <= 5):
         return jsonify({'message': 'Rating must be an integer between 1 and 5'}), 400
 
+    # Fetch user's rating
     identity = get_jwt_identity()
     user_id = identity['id']
-
     rating = Rating.query.filter_by(user_id=user_id, movie_id=movie_id).first()
     if not rating:
         return jsonify({'message': 'Rating not found'}), 404
 
+    # Update rating
     rating.rating = new_rating_value
     db.session.commit()
 
     return jsonify({'message': 'Rating updated successfully'}), 200
 
+
 # Admin Deletes Any Movie's User Rating Endpoint
 @app.route('/ratings/<int:rating_id>', methods=['DELETE'])
 @admin_required
 def delete_rating_admin(rating_id):
+    """Admin deletes any user's rating for a movie."""
     rating = Rating.query.get(rating_id)
     if not rating:
         return jsonify({'message': 'Rating not found'}), 404
@@ -223,13 +239,14 @@ def delete_rating_admin(rating_id):
 
     return jsonify({'message': 'Rating deleted successfully'}), 200
 
+
 # User Deletes Their Own Rating Endpoint
 @app.route('/movies/<int:movie_id>/rate', methods=['DELETE'])
 @jwt_required()
 def delete_rating_user(movie_id):
+    """User deletes their own rating for a movie."""
     identity = get_jwt_identity()
     user_id = identity['id']
-
     rating = Rating.query.filter_by(user_id=user_id, movie_id=movie_id).first()
     if not rating:
         return jsonify({'message': 'Rating not found'}), 404
@@ -239,15 +256,23 @@ def delete_rating_user(movie_id):
 
     return jsonify({'message': 'Rating deleted successfully'}), 200
 
+
+# =======================
+# FILE MANAGEMENT ROUTES
+# =======================
+
 # Helper Function to Check Allowed Extensions
 def allowed_file(filename):
+    """Check if the file has an allowed extension."""
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
+
 
 # File Upload Endpoint
 @app.route('/upload', methods=['POST'])
 @jwt_required()
 def upload_file():
+    """Upload a file."""
     if 'file' not in request.files:
         return jsonify({'message': 'No file part in the request'}), 400
 
@@ -264,6 +289,7 @@ def upload_file():
         identity = get_jwt_identity()
         user_id = identity['id']
 
+        # Add the file to the database
         uploaded_file = UploadedFile(
             filename=filename,
             filepath=filepath,
@@ -277,10 +303,12 @@ def upload_file():
         allowed = ", ".join(app.config['ALLOWED_EXTENSIONS'])
         return jsonify({'message': f'Allowed file types are: {allowed}'}), 400
 
+
 # List All Uploaded Files (Admin Only) Endpoint
 @app.route('/files', methods=['GET'])
 @admin_required
 def get_all_uploaded_files():
+    """Admin retrieves a list of all uploaded files."""
     files = UploadedFile.query.all()
     output = []
     for file in files:
@@ -293,10 +321,12 @@ def get_all_uploaded_files():
         output.append(file_data)
     return jsonify({'files': output}), 200
 
+
 # List User's Uploaded Files Endpoint
 @app.route('/users/me/files', methods=['GET'])
 @jwt_required()
 def get_user_uploaded_files():
+    """User retrieves a list of their own uploaded files."""
     identity = get_jwt_identity()
     user_id = identity['id']
     files = UploadedFile.query.filter_by(user_id=user_id).all()
@@ -310,10 +340,12 @@ def get_user_uploaded_files():
         output.append(file_data)
     return jsonify({'files': output}), 200
 
+
 # Download a Specific File Endpoint
 @app.route('/files/<int:file_id>', methods=['GET'])
 @jwt_required()
 def download_file(file_id):
+    """User or admin downloads a specific file."""
     file = UploadedFile.query.get(file_id)
     if not file:
         return jsonify({'message': 'File not found'}), 404
@@ -328,10 +360,12 @@ def download_file(file_id):
 
     return send_from_directory(app.config['UPLOAD_FOLDER'], file.filename, as_attachment=True)
 
+
 # Delete a File Endpoint
 @app.route('/files/<int:file_id>', methods=['DELETE'])
 @jwt_required()
 def delete_file(file_id):
+    """User or admin deletes a file."""
     file = UploadedFile.query.get(file_id)
     if not file:
         return jsonify({'message': 'File not found'}), 404
@@ -356,9 +390,15 @@ def delete_file(file_id):
 
     return jsonify({'message': 'File deleted successfully'}), 200
 
-# Fetch All Movies Endpoint (send poster paths and ratings too)
+
+# ==========================
+# FETCHING MOVIES AND STATIC
+# ==========================
+
+# Fetch All Movies Endpoint
 @app.route('/movies', methods=['GET'])
 def get_movies():
+    """Fetch all movies with pagination."""
     page = request.args.get('page', 1, type=int)  # Default to page 1 if not provided
     per_page = 20  # Number of movies per page
     movies = Movie.query.paginate(page=page, per_page=per_page, error_out=False)
@@ -372,9 +412,6 @@ def get_movies():
         'vote_average': movie.vote_average
     } for movie in movies.items]
 
-    # Print output to check
-    print(output)
-
     return jsonify({
         'movies': output,
         'total_pages': movies.pages,
@@ -382,11 +419,13 @@ def get_movies():
     }), 200
 
 
-
-# Serve static files
+# Serve Static Files
 @app.route('/static/<path:filename>')
 def static_files(filename):
+    """Serve static files."""
     return send_from_directory(os.path.join(app.root_path, 'static'), filename)
 
+
+# Run the Flask app
 if __name__ == '__main__':
     app.run(debug=True)

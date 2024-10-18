@@ -6,3 +6,4 @@ Flask_CORS
 psycopg2-binary
 python-dotenv
 werkzeug
+requests
