@@ -1,5 +1,26 @@
 # Movie Rating Service
 
+# cpsc449proj.1
+
+Kevin Byon     CWID: 887345262      
+
+email: kbyon@csu.fullerton.edu 
+
+
+Johnny Quach   CWID: 885168989  
+
+email: JqJohnny@csu.fullerton.edu
+
+
+Jeevan Gowda   CWID: 885168989
+
+email: jeevangowda@csu.fullerton.edu
+
+
+Samantha Rehome   CWID: 887904126  
+
+email: 4srehome@csu.fullerton.edu
+
 ## Overview
 
 The **Movie Rating Service** is a full-stack web application that allows users to register, log in, rate movies, and upload files. Admin users have additional privileges to manage movies and delete any user's ratings. The application is built with a Flask backend, and the movie data is fetched from the **TMDB (The Movie Database)** API. The project implements user authentication, role-based access control, and file handling for movie-related uploads.
